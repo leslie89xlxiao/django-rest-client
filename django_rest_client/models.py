@@ -1,6 +1,8 @@
-from jsonfield import JSONField
+# from jsonfield import JSONField
 
 from django.db import models
+
+from jsoneditor.fields.django_jsonfield import JSONField
 
 
 class DjangoRestClient(models.Model):
@@ -9,3 +11,6 @@ class DjangoRestClient(models.Model):
 
     class Meta:
         db_table = 'django_rest_client'
+
+    def __str__(self, *args, **kwargs):
+        return self.name

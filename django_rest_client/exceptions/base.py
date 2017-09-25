@@ -1,39 +1,88 @@
-import json
+class RestClientError(Exception):
+
+    @property
+    def err_msg(self):
+        return str(self)
 
 
-class RestClientException(Exception):
+class ConfigError(RestClientError):
     pass
 
 
-class ConfigException(RestClientException):
+class InvalidRestMethodError(RestClientError):
     pass
 
 
-class InvalidRestMethodException(RestClientException):
-    pass
+class ServerResponseError(RestClientError):
+    """Server response error class for client."""
 
-
-class ServerResponseException(RestClientException):
-
-    def __init__(self, **kwargs):
-        self.client = kwargs.get('client', None)
-        self.url = kwargs.get('url', None)
-        self.method = kwargs.get('method', None)
-        self.kwargs = kwargs.get('kwargs', None)
-        self.response = kwargs.get('response', None)
+    def __init__(self, *args, **kwargs):
+        if args and isinstance(args[0], ServerResponseError):
+            self._kwargs = args[0].kwargs
+            self.url = args[0].url
+            self.response = args[0].response
+            self.client = args[0].client
+        else:
+            self._kwargs = kwargs.pop('kwargs', None)
+            self.url = kwargs.pop('url', None)
+            self.response = kwargs.pop('response', None)
+            self.client = kwargs.pop('client', None)
+        super(ServerResponseError, self).__init__(*args, **kwargs)
 
     def __str__(self):
-        msg = {
-            'request': {
-                'client': self.client.__class__.__name__,
-                'url': self.url,
-                'headers': self.response.headers,
-                'method': self.method,
-                'kwargs': self.kwargs
-            },
-            'response': {
-                'text': self.response.text
-            }
-        }
+        if self.response is not None:
+            rsp = self.response
 
-        return u'Server response not OK. Detail: {}'.format(json.dumps(msg))
+            if rsp is not None:
+                body = self.client._error_parser(rsp.text)
+
+                msg = (u'{0.url} returned HTTP {1.status_code}: {0.kwargs}'
+                       u'Response Headers: {1.headers} Body: {2}').format(
+                           self, rsp, body)
+            else:
+                msg = (u'{0.url} error: {1.kwargs}').format(self)
+            return u'Server response not OK. Verbose: {}'.format(msg)
+        else:
+            return super(ServerResponseError, self).__str__()
+
+    @property
+    def kwargs(self):
+        return Guardor.cleanse_content(self._kwargs)
+
+    @property
+    def err_msg(self):
+        if self.response._content:
+            try:
+                return self.response.json()
+            except:
+                return self.response.text
+        else:
+            return str(self)
+
+    @property
+    def message(self):
+        return str(self)
+
+    def __repr__(self):
+        result = super(ServerResponseError, self).__repr__()
+        detail_info = u'ServerResponseException({}),'.format(repr(self.message))
+        return result.replace(u'ServerResponseException(),', detail_info)
+
+
+class DebugError(ServerResponseError):
+
+    def __str__(self):
+        if self.response is not None:
+            rsp = self.response
+
+            if rsp is not None:
+                body = self.client._error_parser(rsp.text)
+
+                msg = (u'{0.url} returned HTTP {1.status_code}: {0.kwargs}\n'
+                       u'Response Headers: {1.headers} \nBody: {2}').format(
+                           self, rsp, body)
+            else:
+                msg = (u'{0.url} error: {1.kwargs}').format(self)
+            return u'Debug Details: \n{}'.format(msg)
+        else:
+            return super(ServerResponseError, self).__str__()
