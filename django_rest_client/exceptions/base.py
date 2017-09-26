@@ -1,3 +1,6 @@
+from django_rest_client.utils import Guardor
+
+
 class RestClientError(Exception):
 
     @property

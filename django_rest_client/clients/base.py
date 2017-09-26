@@ -10,6 +10,7 @@ from django_rest_client.exceptions import ConfigError, ServerResponseError, \
     InvalidRestMethodError, DebugError, RestClientError
 from django_rest_client.models import DjangoRestClient
 from django_rest_client.decorators import json_format
+from django_rest_client.settings import REST_CLIENT_SETTINGS
 
 logger = logging.getLogger('django_rest_client')
 
@@ -38,14 +39,15 @@ class Client(object):
         if self._config_name is None:
             raise ConfigError('Please set "_config_name" for setting lookup')
 
-        try:
-            rest_client = DjangoRestClient.objects.get(name=self._config_name)
-        except:
+        rest_client_config = DjangoRestClient.objects.filter(name=self._config_name).first() \
+            or REST_CLIENT_SETTINGS.get(self._config_name, {})
+
+        if not rest_client_config:
             raise ConfigError('Config name for {} class_name is not found.'
                               .format(self._config_name))
 
-        if not self.profile and self.profile in rest_client.config:
-            self._config = rest_client.config[self.profile]
+        if self.profile and self.profile in rest_client_config:
+            self._config = rest_client_config[self.profile]
         else:
             raise ConfigError('Configuration for {} is not found with profile {}'
                               .format(class_name, self.profile))
@@ -57,7 +59,7 @@ class Client(object):
         self._timeout = self._config.get('TIMEOUT', self._default_timeout)
 
     def _build_base_url(self):
-        scheme = self._config.get('SCHEME', 'http')
+        scheme = self._config.get('SCHEMreE', 'http')
         hostname = self._config['HOSTNAME']
         port = self._config.get('PORT', 80)
         base_url = '{}://{}:{}'.format(scheme, hostname, port)
